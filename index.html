@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>턴메이트 — 기능 정리 & 리디자인</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #e9ecef; font-family: Pretendard, -apple-system, sans-serif; color: #121a23; -webkit-font-smoothing: antialiased; }
+  input, select, textarea, button { font-family: inherit; }
+  .tm-press { transition: transform .12s ease, background .15s; }
+  .tm-press:active { transform: scale(.975); }
+  .tm-noscroll::-webkit-scrollbar { display: none; }
+  .tm-noscroll { scrollbar-width: none; }
+  .tm-dot { width: 6px; height: 6px; border-radius: 3px; background: currentColor; animation: tmblink 1.4s infinite; display: inline-block; }
+  @keyframes tmblink { 50% { opacity: .22; } }
+  .tm-pulse { animation: tmpulse 1.1s infinite; }
+  @keyframes tmpulse { 0% { box-shadow: 0 0 0 0 oklch(0.53 0.15 248 / .5); } 100% { box-shadow: 0 0 0 24px oklch(0.53 0.15 248 / 0); } }
+  .tm-pop { animation: tmpop .45s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes tmpop { from { transform: scale(.4); opacity: 0; } }
+  .tm-toast { animation: tmtoast .28s cubic-bezier(.2,.85,.25,1); }
+  @keyframes tmtoast { from { transform: translateY(-16px); opacity: 0; } }
+  .tm-fade { animation: tmfade .28s ease-out; }
+  @keyframes tmfade { from { opacity: 0; transform: translateY(6px); } }
+
+  .page { min-height: 100vh; display: grid; grid-template-columns: minmax(350px, 560px) auto; gap: 52px; justify-content: center; align-items: start; padding: 36px 40px 72px; }
+  .notes { position: sticky; top: 36px; max-height: calc(100vh - 72px); overflow-y: auto; padding-right: 10px; }
+  .notes h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; margin: 0 0 8px; line-height: 1.24; }
+  .notes .lead { font-size: 14.5px; color: #45505c; line-height: 1.62; margin: 0 0 20px; text-wrap: pretty; }
+  .notetabs { display: flex; gap: 4px; padding: 4px; background: #fff; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(16,24,40,.05); }
+  .notetabs button { flex: 1; height: 36px; border: none; border-radius: 9px; background: transparent; font-family: inherit; font-size: 13px; font-weight: 700; color: #818b96; cursor: pointer; }
+  .notetabs button.on { background: #121a23; color: #fff; }
+  .notes h2 { font-size: 12px; font-weight: 750; color: #818b96; letter-spacing: .5px; margin: 22px 0 9px; }
+  .grp { border-top: 1px solid #d9dde2; padding: 13px 0 4px; }
+  .grp:first-of-type { border-top: none; }
+  .grp > b { display: block; font-size: 14.5px; font-weight: 780; letter-spacing: -0.2px; margin-bottom: 8px; }
+  .feat { display: grid; grid-template-columns: 15px 1fr auto; gap: 8px; align-items: start; padding: 5px 0; font-size: 13px; line-height: 1.5; color: #45505c; }
+  .feat .dot { width: 7px; height: 7px; border-radius: 4px; margin-top: 6px; }
+  .feat .st { font-size: 10.5px; font-weight: 750; letter-spacing: .2px; padding: 2px 6px; border-radius: 5px; white-space: nowrap; margin-top: 1px; }
+  .st.on { background: oklch(0.96 0.03 158); color: oklch(0.48 0.11 158); }
+  .st.merge { background: oklch(0.96 0.028 248); color: oklch(0.44 0.12 250); }
+  .st.cut { background: #eef0f2; color: #9aa4ae; text-decoration: line-through; }
+  .fix { display: grid; grid-template-columns: 24px 1fr; gap: 0 9px; padding: 12px 0; border-top: 1px solid #d9dde2; }
+  .fix .n { font-size: 12px; font-weight: 800; color: #818b96; padding-top: 2px; font-variant-numeric: tabular-nums; }
+  .fix b { display: block; font-size: 14.5px; font-weight: 760; margin-bottom: 3px; letter-spacing: -0.2px; }
+  .fix p { margin: 0; font-size: 13px; line-height: 1.6; color: #45505c; text-wrap: pretty; }
+  .fix .was { color: #a0522d; }
+  .jump { display: inline-flex; margin-top: 6px; font-size: 12px; font-weight: 700; color: oklch(0.53 0.15 248); background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; }
+  .tokens { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 4px; }
+  .tok { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #45505c; background: #fff; border-radius: 8px; padding: 6px 9px 6px 6px; font-weight: 600; }
+  .tok i { width: 18px; height: 18px; border-radius: 5px; display: block; }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin: 2px 0 12px; font-size: 11.5px; color: #6b7683; font-weight: 650; }
+  .legend span { display: flex; align-items: center; gap: 4px; }
+  @media (max-width: 1020px) { .page { grid-template-columns: 1fr; justify-items: center; padding: 24px 18px 60px; } .notes { position: static; max-height: none; max-width: 600px; width: 100%; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+
+<script type="text/babel" src="ios_frame.jsx?v=10"></script>
+<script type="text/babel" src="app/store.jsx?v=10"></script>
+<script type="text/babel" src="app/ui.jsx?v=10"></script>
+<script type="text/babel" src="app/geo.jsx?v=10"></script>
+<script type="text/babel" src="app/rate-table.jsx?v=10"></script>
+<script type="text/babel" src="app/week-timeline.jsx?v=10"></script>
+<script type="text/babel" src="app/i-home.jsx?v=10"></script>
+<script type="text/babel" src="app/i-market.jsx?v=10"></script>
+<script type="text/babel" src="app/i-request.jsx?v=10"></script>
+<script type="text/babel" src="app/i-schedule.jsx?v=10"></script>
+<script type="text/babel" src="app/i-salary.jsx?v=10"></script>
+<script type="text/babel" src="app/a-dash.jsx?v=10"></script>
+<script type="text/babel" src="app/a-schedule.jsx?v=10"></script>
+<script type="text/babel" src="app/a-salary.jsx?v=10"></script>
+<script type="text/babel" src="app/onboarding.jsx?v=10"></script>
+
+<script type="text/babel">
+const IN_TABS = [
+  { id: 'home', label: '홈', icon: 'House' },
+  { id: 'market', label: '대직', icon: 'ArrowLeftRight' },
+  { id: 'schedule', label: '일정', icon: 'CalendarDays' },
+  { id: 'me', label: '내 정보', icon: 'CircleUser' },
+];
+const AD_TABS = [
+  { id: 'ad_home', label: '관제', icon: 'LayoutDashboard' },
+  { id: 'ad_approvals', label: '승인', icon: 'ClipboardCheck' },
+  { id: 'ad_schedule', label: '근무표', icon: 'CalendarRange' },
+  { id: 'ad_salary', label: '급여', icon: 'Wallet' },
+  { id: 'ad_settings', label: '설정', icon: 'Settings' },
+];
+
+function App() {
+  const app = useTurnMate();
+  const [role, setRole] = React.useState(() => localStorage.getItem('tm_role') || 'instructor');
+  const [tab, setTab] = React.useState(() => localStorage.getItem('tm_tab') || 'home');
+  const [adTab, setAdTab] = React.useState('ad_home');
+  const [mkTab, setMkTab] = React.useState('find');
+  const [detail, setDetail] = React.useState(null);
+  const [assign, setAssign] = React.useState(null);
+  const [salarySheet, setSalarySheet] = React.useState(false);
+  const [instructorSheet, setInstructorSheet] = React.useState(null);
+  const [confirmSheet, setConfirmSheet] = React.useState(false);
+  const [adFilter, setAdFilter] = React.useState('urgent');
+  const scrollRef = React.useRef(null);
+
+  const notes = React.useRef(null);
+  const [noteTab, setNoteTab] = React.useState('features');
+
+  const setRoleBoth = (r) => { setRole(r); localStorage.setItem('tm_role', r); scrollRef.current && (scrollRef.current.scrollTop = 0); };
+  const changeTab = (t) => { setTab(t); localStorage.setItem('tm_tab', t); scrollRef.current && (scrollRef.current.scrollTop = 0); };
+  const go = (t, id, sub) => { changeTab(t); if (t === 'market') setMkTab(sub || 'find'); if (id) setTimeout(() => setDetail(id), 130); };
+  const goAdmin = (t, a) => { setRoleBoth('admin'); setAdTab(t); if (a) setAdFilter(a); };
+
+  React.useEffect(() => {
+    window.__tm = {
+      go, goAdmin, setRole: setRoleBoth, setDetail, setAssign, setConfirmSheet, setSalarySheet, setInstructorSheet,
+      setNoteTab, setAdTab, setAdFilter, setMkTab, reset: app.resetAll, setMe: app.setMe,
+      openOnboarding: app.resetOnboarding,
+    };
+  });
+
+  const openReqs = app.state.requests.filter(r => r.status === 'recruiting' && r.by !== app.me).length;
+  const urg = app.state.requests.filter(r => r.status === 'recruiting' && tm2Dday(r.date) <= 2 && tm2Dday(r.date) >= 0).length;
+  const tabs = role === 'instructor' ? IN_TABS : AD_TABS;
+  const active = role === 'instructor' ? tab : adTab;
+
+  if (!app.state.onboarded) {
+    return (
+      <div className="page">
+        <Notes noteTab={noteTab} setNoteTab={setNoteTab} role={role} setRole={setRoleBoth} app={app} />
+        <div style={{ paddingTop: 4 }}>
+          <IOSDevice width={402} height={874}>
+            <div style={{ position: 'relative', height: '100%', background: '#fff' }}>
+              <Onboarding app={app} onDone={() => { setRoleBoth('instructor'); changeTab('home'); }} />
+            </div>
+          </IOSDevice>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="page">
+      <Notes noteTab={noteTab} setNoteTab={setNoteTab} role={role} setRole={setRoleBoth} app={app} />
+      <div style={{ paddingTop: 4 }}>
+        <IOSDevice width={402} height={874}>
+          <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', background: T.bg,
+            fontFamily: 'Pretendard, -apple-system, sans-serif', color: T.ink, overflow: 'hidden' }}>
+            <div ref={scrollRef} className="tm-noscroll" style={{ flex: 1, overflowY: 'auto', paddingTop: 54 }}>
+              <div key={role + active + app.me} className="tm-fade">
+                {role === 'instructor' ? (
+                  <>
+                    {tab === 'home' && <IHome app={app} go={go} />}
+                    {tab === 'market' && <IMarket app={app} onOpen={setDetail} tab={mkTab} setTab={setMkTab} />}
+                    {tab === 'schedule' && <ISchedule app={app} />}
+                    {tab === 'me' && <IMe app={app} openSalary={() => setSalarySheet(true)} openOnboarding={app.resetOnboarding} />}
+                  </>
+                ) : (
+                  <>
+                    {adTab === 'ad_home' && <ADash app={app} goApprovals={() => { setAdTab('ad_approvals'); setAdFilter('urgent'); }}
+                      setApproval={setAssign} setTab={setAdTab} />}
+                    {adTab === 'ad_approvals' && <AApprovals app={app} filter={adFilter} setFilter={setAdFilter} setApproval={setAssign} />}
+                    {adTab === 'ad_schedule' && <ASchedule app={app} openInstructor={setInstructorSheet} openConfirm={() => setConfirmSheet(true)} />}
+                    {adTab === 'ad_salary' && <ASalary app={app} />}
+                    {adTab === 'ad_settings' && <ASettings app={app} />}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <nav style={{ display: 'grid', gridTemplateColumns: `repeat(${tabs.length},1fr)`, background: 'rgba(255,255,255,.97)',
+              borderTop: `1px solid ${T.line}`, paddingBottom: 26, backdropFilter: 'blur(12px)', flexShrink: 0 }}>
+              {tabs.map(t => {
+                const on = active === t.id;
+                const badge = t.id === 'market' ? openReqs : t.id === 'ad_approvals' ? urg : 0;
+                return (
+                  <button key={t.id} onClick={() => role === 'instructor' ? changeTab(t.id) : setAdTab(t.id)}
+                    style={{ height: 58, border: 'none', background: 'none', fontFamily: 'inherit', cursor: 'pointer', display: 'flex',
+                      flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, color: on ? T.ink : T.ink3 }}>
+                    <span style={{ position: 'relative' }}>
+                      <Icon name={t.icon} size={23} stroke={on ? 2.3 : 1.8} />
+                      {badge > 0 && <span style={{ position: 'absolute', top: -4, right: -9, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9,
+                        background: T.red, color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', border: '2px solid #fff' }}>{badge}</span>}
+                    </span>
+                    <span style={{ fontSize: 11.5, fontWeight: on ? 750 : 600 }}>{t.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            <MarketDetail id={detail} onClose={() => setDetail(null)} app={app} />
+            <AssignSheet id={assign} onClose={() => setAssign(null)} app={app} />
+            <SalarySheet open={salarySheet} onClose={() => setSalarySheet(false)} app={app} />
+            <InstructorSheet id={instructorSheet} onClose={() => setInstructorSheet(null)} app={app} />
+            <ConfirmSheet open={confirmSheet} onClose={() => setConfirmSheet(false)} app={app} />
+
+            {app.toast && (
+              <div key={app.toast.key} className="tm-toast" style={{ position: 'absolute', top: 56, left: 14, right: 14, zIndex: 100, background: T.ink,
+                color: '#fff', borderRadius: 14, padding: '13px 16px', fontSize: 14, fontWeight: 650, display: 'flex', alignItems: 'flex-start',
+                gap: 9, boxShadow: '0 12px 32px rgba(0,0,0,.28)', lineHeight: 1.45 }}>
+                <Icon name="Check" size={17} stroke={2.8} color="#fff" style={{ marginTop: 1 }} />{app.toast.msg}
+              </div>
+            )}
+          </div>
+        </IOSDevice>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------- notes ------------------------- */
+const FEATURES = [
+  { g: '강사 · 홈', items: [
+    ['오늘 일정과 다음 근무', 'on', '다음 근무 카드 하나로 통합'],
+    ['주간 정규 / 대직 근무시간', 'merge', '급여 카드의 주간 진행바로'],
+    ['오늘·월 급여(3.3% 공제)', 'on', '실수령액 + 정규/대직 분리'],
+    ['주 14시간 안내 문구', 'merge', '별도 경고문 대신 진행바로'],
+    ['대직 요청 · 지원 · 출근 바로가기', 'merge', '카드 2개 + 다음 근무 카드 안 버튼'],
+    ['내 대직 현황 요약', 'on', '‘내 대직’ 섹션'],
+    ['푸시형 토스트', 'on', '상단 토스트로 유지'],
+  ]},
+  { g: '강사 · 대직', items: [
+    ['모집 중 / 마감 목록', 'on', 'D-day 순 정렬, 마감은 흐리게'],
+    ['근무유형·대상·난이도·날짜 필터', 'merge', '칩 6개 + “지원 가능한 것만”'],
+    ['즉시 지원 → 자동 확정', 'on', '수당 확인 후 버튼 하나로'],
+    ['본인 요청 지원 차단 · 시간 충돌 경고', 'on', '카드 배지 + 버튼 비활성'],
+    ['공고 상세(시간·대상·난이도·메모)', 'on', '시트로 분리'],
+    ['대직 요청 취소', 'on', '원래 근무로 복구'],
+    ['내 요청 / 지원 내역', 'merge', '‘내 요청’ 탭으로 통합'],
+  ]},
+  { g: '강사 · 대직 요청', items: [
+    ['기존 근무 불러오기', 'merge', '1단계에서 근무 선택'],
+    ['직접 입력(시설·날짜·시간·유형·대상·난이도)', 'on', '직접 입력은 날짜·시간·프로그램만'],
+    ['다중 시간대 묶음 요청', 'on', '1단계 다중 선택'],
+    ['사유 · 전달 메모', 'on', '사유 칩 + 메모 + 빠른 문구'],
+    ['요약 확인서', 'on', '3단계 요약'],
+  ]},
+  { g: '강사 · 일정 · 내 정보', items: [
+    ['월간 캘린더', 'on', '정규·대직·요청중 구분'],
+    ['주간 타임라인', 'merge', '요일 스트립 + 선택일 상세'],
+    ['프로필 · 자격증 · 프로그램', 'on', '내 정보 상단'],
+    ['급여 명세(항목별·근무 내역)', 'on', '시트 + CSV'],
+    ['GPS 출근 / 수동 출근 / 퇴근', 'on', '3상태 시트 · 거리 표시'],
+    ['센터 반경 진입 알림', 'on', 'GPS watchPosition + 도착 시트·알림'],
+    ['경력별 강습 단가 (26/27/28천원)', 'on', '1·2·3년차 단가 자동 적용'],
+    ['안전근무 단가 (평일 17,000 / 주말 18,000)', 'on', '요일로 자동 구분'],
+    ['알림 토글', 'on', '내 정보 목록'],
+    ['온보딩 재실행', 'on', '내 정보 하단'],
+    ['관리자 모드 전환', 'merge', '좌측 역할 전환 버튼'],
+    ['샘플 계정 전환', 'on', '내 정보 하단'],
+  ]},
+  { g: '관리자', items: [
+    ['운영 현황 지표 4개', 'merge', '오늘 근무·현장 근무·확정 3개'],
+    ['2일 전 긴급 경보 + 전체 푸시', 'on', '관제 첫 카드'],
+    ['현장 출퇴근 현황', 'on', '관제 목록'],
+    ['대직 관제 · 지원자 승인/반려', 'on', '승인 탭 3분류'],
+    ['관리자 직권 배정', 'on', '후보 비교 시트'],
+    ['대직 확인서(8열 서식·교시 자동 기입)', 'merge', '교시 표 + 프로그램명 정정 + CSV'],
+    ['확인서 보완 대상 관리', 'cut', '스냅샷 누락 개념은 제거'],
+    ['센터 전체 / 개인 근무표', 'on', '주간 그리드 + 월간 + 강사 상세'],
+    ['대직표 출력 · 인쇄/PDF', 'merge', 'CSV 내보내기로 대체'],
+    ['강사별 급여 · 3.3% 공제', 'on', '4열 표 + 합계'],
+    ['관리자 금액 조정 + 사유 이력', 'merge', '조정 모달(이력은 사유로 갈음)'],
+    ['월 정산 확정 · 잠금', 'on', '확정 후 조정 잠김'],
+    ['단가 · 주간 기준 · 시설 설정', 'on', '설정 탭'],
+    ['강사 상세(경력별 단가표)', 'on', '근무표에서 강사 탭'],
+    ['Google Sheets 동기화 · OAuth', 'cut', '권한·검증 이슈로 CSV로 대체'],
+    ['Firebase 인증 · 데모모드 잠금', 'cut', '프로토타입에선 역할 전환'],
+    ['시범운영 MVP 배너 · 개발 문구', 'cut', '제거'],
+  ]},
+];
+
+const FIXES = [
+  { t: '단가를 실제 규칙대로', p: '일반 강습은 경력에 따라 1년차 26,000 / 2년차 27,000 / 3년차 이상 28,000원, 안전근무는 평일 17,000 / 주말 18,000원입니다. 강사의 경력과 근무 요일로 자동 적용되고, 설정에서 모든 금액을 바꿀 수 있어요.', a: () => window.__tm.goAdmin('ad_settings') },
+  { t: '센터 도착을 GPS로 자동 감지', p: 'watchPosition으로 위치를 계속 받아 센터 좌표까지의 거리를 계산합니다(haversine). 반경 안에 들어오면 도착 시트와 시스템 알림이 뜨고, 밖으로 나가면 다시 무장돼 다음 진입에 또 알려줍니다.', a: () => window.__tm.setRole('instructor') },
+  { t: '권한은 켜는 순간에만 요청', p: '위치·알림 권한을 토글 클릭 안에서 요청합니다. 차단되면 카드에 이유를 그대로 보여주고, 수동 출근은 그대로 쓸 수 있어요.', a: () => window.__tm.setRole('instructor') },
+  { t: '데모로 먼저 확인', p: '위치가 막힌 환경을 위해 “데모로 확인”을 넣었습니다. 900m에서 접근하는 경로를 흉내 내 반경 진입 순간에 알림이 뜨는지 볼 수 있어요.', a: () => window.__tm.setRole('instructor') },
+  { t: '데이터가 실제로 움직이게', p: '지원하면 근무표·급여·일정에 즉시 반영되고, 조정·정산 확정·CSV 내보내기까지 실제로 동작합니다. localStorage에 상태가 남아 새로고침해도 유지돼요.', a: () => window.__tm.go('market') },
+  { t: '홈은 “다음 근무”부터', was: '지표 4개 + 안내문이 한 화면에', p: '오늘 몇 시에 어디서 뭘 하는지가 먼저 보이도록 순서를 바꿨습니다. 출근 버튼도 이 카드 안에 있어요.', a: () => window.__tm.setRole('instructor') },
+  { t: '대직 카드는 4개 정보만', p: 'D-day · 시간 · 프로그램 · 수당. 원 담당·대상·난이도·메모는 시트로 내렸습니다. 지원 전에 수당과 실수령을 같이 보여줘 “얼마 받는지”를 확인하고 누르게 했어요.', a: () => window.__tm.setDetail('r2') },
+  { t: '요청은 3단계로', was: '필드 12개가 한 모달에', p: '근무 선택 → 사유·메모 → 요약. 시간·대상·난이도는 선택한 근무에서 자동으로 가져오고, 여러 시간대를 한 번에 묶을 수 있습니다.', a: () => window.__tm.go('market', null, 'mine') },
+  { t: '관리자는 “할 일” 중심', p: '관제 첫 카드는 긴급 미구인 1건과 두 개의 행동(전체 알림 / 직권 배정)입니다. 승인은 목록, 근무표는 그리드, 급여는 합계 → 개인 순서로 역할을 나눴습니다.', a: () => window.__tm.goAdmin('ad_home') },
+  { t: '직권 배정은 후보 비교로', was: '드롭다운 + 확인 버튼', p: '같은 시간 근무가 없는 강사를 위로, 이번 주 시간과 주력 프로그램을 함께 보여줍니다. 기준 시간을 넘기면 배정 전에 경고합니다.', a: () => window.__tm.setAssign('r2') },
+  { t: '글자·터치 크기', was: '10–11px 텍스트 200여 곳, 9px 배지', p: '본문 14.5–16px, 보조 12.5px 이상, 주요 버튼 52px, 칩 38px. 수영장에서 젖은 손으로 쓰는 앱 기준입니다.' },
+  { t: '색은 의미만', p: '중립 잉크 + 정규(파랑) · 대직(주황) · 긴급(빨강) · 완료(초록). 그라데이션·이모지·8색 배지는 제거했습니다.' },
+];
+
+function Notes({ noteTab, setNoteTab, role, setRole, app }) {
+  return (
+    <aside className="notes">
+      <h1>턴메이트 기능 정리 &amp; 리디자인</h1>
+      <p className="lead">원본 코드(<code>reference/turnmate-main</code>)의 기능을 모두 세어 정리하고, 그 위에서 화면을 다시 만들었습니다. 폰은 실제로 동작합니다.</p>
+      <div className="notetabs">
+        <button className={noteTab === 'features' ? 'on' : ''} onClick={() => setNoteTab('features')}>기능 정리</button>
+        <button className={noteTab === 'fixes' ? 'on' : ''} onClick={() => setNoteTab('fixes')}>수정 사항</button>
+        <button className={noteTab === 'tokens' ? 'on' : ''} onClick={() => setNoteTab('tokens')}>기준</button>
+      </div>
+
+      {noteTab === 'features' && (
+        <>
+          <div className="legend">
+            <span><i style={{ width: 7, height: 7, borderRadius: 4, background: 'oklch(0.56 0.12 158)' }} />구현</span>
+            <span><i style={{ width: 7, height: 7, borderRadius: 4, background: 'oklch(0.53 0.15 248)' }} />통합·변형</span>
+            <span><i style={{ width: 7, height: 7, borderRadius: 4, background: '#c3cbd3' }} />제외</span>
+          </div>
+          {FEATURES.map(f => (
+            <div className="grp" key={f.g}>
+              <b>{f.g}</b>
+              {f.items.map(([name, st, note]) => (
+                <div className="feat" key={name}>
+                  <i className="dot" style={{ background: st === 'on' ? 'oklch(0.56 0.12 158)' : st === 'merge' ? 'oklch(0.53 0.15 248)' : '#c3cbd3' }} />
+                  <span>{name}{note && <span style={{ color: '#8a949e' }}> — {note}</span>}</span>
+                  <span className={'st ' + st}>{st === 'on' ? '구현' : st === 'merge' ? '통합' : '제외'}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </>
+      )}
+
+      {noteTab === 'fixes' && (
+        <>
+          <div className="notetabs" style={{ marginBottom: 10, marginTop: 2 }}>
+            <button className={role === 'instructor' ? 'on' : ''} onClick={() => window.__tm.setRole('instructor')}>강사 화면</button>
+            <button className={role === 'admin' ? 'on' : ''} onClick={() => window.__tm.goAdmin('ad_home')}>관리자 화면</button>
+          </div>
+          {FIXES.map((f, i) => (
+            <div className="fix" key={i}>
+              <span className="n">{String(i + 1).padStart(2, '0')}</span>
+              <div>
+                <b>{f.t}</b>
+                <p>{f.was && <span className="was">기존: {f.was}. </span>}{f.p}</p>
+                {f.a && <button className="jump" onClick={f.a}>폰에서 보기 →</button>}
+              </div>
+            </div>
+          ))}
+          <h2>데모 초기화</h2>
+          <button className="jump" onClick={() => app.resetAll()}>모든 데이터를 처음 상태로 →</button>
+          <button className="jump" style={{ marginTop: 8 }} onClick={() => app.resetOnboarding()}>온보딩 처음부터 다시 →</button>
+        </>
+      )}
+
+      {noteTab === 'tokens' && (
+        <>
+          <h2>지급 단가</h2>
+          <RateTable highlightExp="3년차" />
+          <p className="lead" style={{ fontSize: 12.5, marginTop: 10, marginBottom: 0 }}>
+            강습은 강사 경력(1·2·3년차 이상)으로, 안전근무는 근무 요일(평일·주말)로 자동 적용됩니다. 관리자 설정에서 금액을 바꾸면 급여·명세·정산표가 모두 즉시 다시 계산돼요.
+          </p>
+          <h2>색</h2>
+          <div className="tokens">
+            {[['잉크', T.ink], ['배경', T.bg], ['정규', T.blue], ['대직', T.amber], ['긴급', T.red], ['완료', T.green]].map(([k, c]) => (
+              <span className="tok" key={k}><i style={{ background: c, border: k === '배경' ? '1px solid #d9dde2' : 'none' }} />{k}</span>
+            ))}
+          </div>
+          <h2>타이포</h2>
+          <p className="lead" style={{ fontSize: 13, marginBottom: 0 }}>
+            Pretendard. 굵기 600 / 700 / 780 세 단계. 화면 제목 25–26, 카드 제목 15.5, 본문 14.5–15, 보조 12.5–13. 숫자는 tabular-nums.
+          </p>
+          <h2>모서리 · 간격</h2>
+          <p className="lead" style={{ fontSize: 13, marginBottom: 0 }}>
+            카드 20, 시트 26, 버튼 14, 태그 6, 입력 13. 화면 좌우 16–20, 카드 사이 10–12.
+          </p>
+          <h2>구조</h2>
+          <p className="lead" style={{ fontSize: 13, marginBottom: 0 }}>
+            강사 탭 4개(홈·대직·일정·내 정보), 관리자 탭 5개(관제·승인·근무표·급여·설정). 상세는 모두 바텀시트, 확인이 필요한 입력만 전체 화면.
+          </p>
+        </>
+      )}
+    </aside>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
